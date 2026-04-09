@@ -1,5 +1,5 @@
 import NaoEncontrado from "../erros/NaoEncontrado.js";
-import {livros} from "../models/index.js";
+import { autores, livros } from "../models/index.js";
 
 class LivroController {
 
@@ -28,7 +28,7 @@ class LivroController {
       } else {
         next(new NaoEncontrado("Id do livro não localizado."));
       }
-      
+
     } catch (erro) {
       next(erro);
     }
@@ -50,7 +50,7 @@ class LivroController {
     try {
       const id = req.params.id;
 
-      const livroAtualizado = await livros.findByIdAndUpdate(id, {$set: req.body}, {new: true});
+      const livroAtualizado = await livros.findByIdAndUpdate(id, { $set: req.body }, { new: true });
 
       if (livroAtualizado !== null) {
         res.status(200).send(livroAtualizado);
@@ -69,7 +69,7 @@ class LivroController {
       const livroExcluido = await livros.findByIdAndDelete(id);
 
       if (livroExcluido !== null) {
-        res.status(200).send({message: "Livro removido com sucesso"});
+        res.status(200).send({ message: "Livro removido com sucesso" });
       } else {
         next(new NaoEncontrado("Id do livro não localizado."));
       }
@@ -78,13 +78,32 @@ class LivroController {
     }
   };
 
-  static listarLivroPorEditora = async (req, res, next) => {
+  static listarLivroPorFiltro = async (req, res, next) => {
     try {
-      const editora = req.query.editora;
+      const { editora, titulo, minPaginas, maxPaginas, nomeAutor } = req.query;
 
-      const livrosResultado = await livros.find({"editora": editora});
+      let busca = {};
 
-      res.status(200).send(livrosResultado);
+      if (editora) busca.editora = editora;
+      if (titulo) busca.titulo = { $regex: titulo, $options: "i" };
+      if (minPaginas) busca.numeroPaginas = { $gte: parseInt(minPaginas) };
+      if (maxPaginas) busca.numeroPaginas = { $lte: parseInt(maxPaginas) };
+      if (nomeAutor) {
+        const autor = await autores.findOne({ nome: { $regex: nomeAutor, $options: "i" } });
+        if (autor !== null) {
+          busca.autor = autor._id;
+        } else {
+          busca = null;
+        }
+
+        if (busca !== null) {
+          const livrosResultado = await livros.find(busca).populate("autor").exec();
+          res.status(200).send(livrosResultado);
+        } else {
+          res.status(200).send([]);
+        }
+
+      }
     } catch (erro) {
       next(erro);
     }
